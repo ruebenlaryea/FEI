@@ -15,6 +15,7 @@ library(plm)
 library(MASS)
 
 
+
 sidebarPanel2 <- function (..., out = NULL,out1 = NULL,out2 = NULL,out3 = NULL, out4 = NULL,out5 = NULL,width = 4) 
 {
   div(class = paste0("col-sm-", width), 
