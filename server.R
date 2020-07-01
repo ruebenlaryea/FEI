@@ -11,31 +11,41 @@ library(tidyverse)
 library(reshape)
 library(plm)
 library(MASS)
+library(Hmisc)
+library(Amelia)
+library(ggplot2)
 
-#FEIdata <- read.xls("port_traffic_imf_exports.xlsx")
-FEIdata <- read.csv("port_traffic_imf_exports.csv",sep = ",")
-#panel regression using plm, fixed country effect
-lm_imf <- plm(imf.val ~ port.traffic, data = FEIdata, index=c("country.code", "month.yr"))
-#generalised linear models
-glmodel <- glm(imf.val ~ port.traffic + country.name, data=FEIdata)
-#summarise models in funtion below
+
+#FEIdata <- read.csv("port_traffic_imf_exports.csv",sep = ",")
+FEIdata <- read.csv("all_factors_vs_imf1.csv",sep = ",")
+
+####Data Exploration
+#dim(FEIdata)
 #View(FEIdata)
-#hivclasses <- read.xls("HIVClasses.xlsx")
-#fit2 <- rpart(Classes~ Maize + Potato + Cassava + WealthGinIndex, method = 'class', data = hivclasses,control =rpart.control(minsplit =1,minbucket=1, cp=0))
-#wt <- readMat("marginal_utils.mat")
-#wt1 <- wt$marginal.utils
-#wt2 <- wt1[4]
-#numargpie <- sapply(wt2, function(x) as.numeric(as.character(x)))
-#mumaize <- numargpie[1]
-#mupotato <- numargpie[2]
-#mucassava <- numargpie[3]
-#muwgi <- numargpie[4]
+#sum(is.na(FEIdata))
+#summary(FEIdata)
+####plot null values
+#missmap(FEIdata, legend = TRUE, col = c("blue", "black"))
+####replace na values by median of column of interest
+FEIdata$port.traffic<- impute(FEIdata$port.traffic, median)
+FEIdata$air.traffic<-impute(FEIdata$air.traffic, median)
+FEIdata$NO2<-impute(FEIdata$NO2, median)
+FEIdata$radiance<-impute(FEIdata$radiance, median)
+FEIdata$imf.val<-impute(FEIdata$imf.val, median)
+#str(FEIdata)
+FEIdata <- data.frame(FEIdata)
+#View(FEIdata)
+# check correlation between independent variables
+#data = subset(FEIdata, select = -c(imf.val,country.name,country.code,month.yr,imf.imports,imf.exports) )
+#cor(data)
+####correlation results reveals high linear relation(0.67) between the independent variables "radiance" and "NO2". So, one of these variables is dropped 
 
-#threshdata <- readMat("util_thresholds.mat")
-#thresh <- threshdata$util.thresholds
-#threshlevel <- thresh[1]
 
-#accuraciesdata <- readMat("accuracies.mat")
+#panel regression using plm, fixed country effect
+lm_imf <- plm(imf.val ~ port.traffic + air.traffic  + NO2 + radiance, data = FEIdata, index=c("country.code", "month.yr"))
+#generalised linear models
+glmodel <- glm(imf.val ~ port.traffic + air.traffic + NO2 + radiance + country.name, data=FEIdata)
+
 
 
 utilityFunction <- function(x) {
@@ -48,14 +58,12 @@ shinyServer(function(input,output,session){
   
   data <-   reactive({
     switch(input$dataset,
-           pt=FEIdata$port.traffic,
-           mt=FEIdata$month.yr,
-           cn=FEIdata$country.name,
-           cc=FEIdata$country.code,
-           imf=FEIdata$imf.val,
-           mn=FEIdata$month,
-           yr=FEIdata$year,
-           n<-nlevels(cn)
+           pt=as.numeric(FEIdata$port.traffic),
+           imf=as.numeric(FEIdata$imf.val),
+           rad =as.numeric(FEIdata$radiance),
+           at = as.numeric(FEIdata$air.traffic),
+           polut = as.numeric(FEIdata$NO2)
+           #n<-nlevels(cn)
            
     )
     
@@ -122,11 +130,11 @@ shinyServer(function(input,output,session){
                         margin: 0;
                         }
                         ")),
-        numericInput("PortTraffic", "PortTraffic Data:", 0),
         selectInput("CountryName", "Choose Country:", levels(FEIdata$country.name)),
-        #numericInput("Country", "Country Data:", 0),
-        #numericInput("CountryCode", "CountryCode Data:", 0),
-        #numericInput("IMF Value", "IMF Data:", 0),
+        numericInput("PortTraffic", "PortTraffic Data:", 0),
+        numericInput("AirTraffic", "AirTraffic Data:", 0),
+        numericInput("pollution", "Pollution Data:", 0),
+        numericInput("radiance", "Radiance Data:", 0),
         actionButton('action', 'Predict')
         
         )
@@ -139,13 +147,7 @@ shinyServer(function(input,output,session){
   
   output$models <-renderPrint({
     
-    #FEIdata$country.name <- as.numeric(FEIdata$country.name) 
-    ###building models
-    #panel regression using plm, fixed country effect
-    #lm_imf <- plm(imf.val ~ port.traffic, data = FEIdata, index=c("country.code", "month.yr"))
-    #generalised linear models
-    #glmodel <- glm(imf.val ~ port.traffic + country.name, data=FEIdata)
-    #summarise models in funtion below
+  cat("There is correlation of 0.67 between the two predictors N02 and Radiance,\n and a correlation of 0.71 between air traffic and port traffic \nBy convention one of these two highly correlated predictors should be dropped from the model\n")
     
     print(summary(lm_imf))
     
@@ -161,7 +163,8 @@ shinyServer(function(input,output,session){
     return(isolate({
       #cgs <- ((input$maize) * mumaize) + ((input$potato) * mupotato) + ((input$cassava) * mucassava) + ((input$wealthginindex) * muwgi)
       #Example of new data for country
-      newdata = data.frame(port.traffic = input$PortTraffic,country.name = input$CountryName)
+      newdata = data.frame(port.traffic = input$PortTraffic, air.traffic =input$AirTraffic, NO2=input$pollution, radiance =input$radiance, country.name = input$CountryName)
+      
       #predict using new data
       newimfvalue <- predict(glmodel, newdata, type="response")
       

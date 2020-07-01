@@ -13,7 +13,9 @@ library(reshape)
 library(shinythemes)
 library(plm)
 library(MASS)
-
+library(Hmisc)
+library(Amelia)
+library(ggplot2)
 
 
 sidebarPanel2 <- function (..., out = NULL,out1 = NULL,out2 = NULL,out3 = NULL, out4 = NULL,out5 = NULL,width = 4) 
@@ -76,9 +78,10 @@ tags$a(href="https://datasciencecampus.ons.gov.uk/projects/faster-indicators-of-
   sidebarPanel2(fluid = FALSE,
     selectInput("dataset","Choose Criterion:",
                 list("PortTraffic" ="pt",
-                     "CountryCode"="cc",
-                     "IMFvalue"="imf"
-                     
+                     "IMFvalue"="imf",
+                     "NightLight"="rad",
+                     "Pollution"="polut",
+                     "AirTraffic"="at"
                      
                 )),
     
